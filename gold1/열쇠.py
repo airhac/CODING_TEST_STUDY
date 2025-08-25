@@ -1,5 +1,5 @@
 import sys
-from collections import deque
+from collections import deque, defaultdict
 
 input = sys.stdin.readline
 
@@ -14,49 +14,86 @@ def wall(x, y):
 dx, dy = [0, -1, 0, 1], [-1, 0, 1, 0]
 
 for _ in range(K):
-    h, w = map(int,input().split().split())
+    h, w = map(int,input().strip().split())
     
-    graph = [list(map(int, input().strip().split())) for _ in range(h)]
-    visited = [[0] * w for _ in range(h)]
+    graph = [list(input().strip()) for _ in range(h)]
     
-    keys = list(input().strip())
-    #일단 입구 위치 부터 찾아야한다.
-    entrance = []
     
+    keys_str = input().strip()
+    
+    H, W = h + 2, w + 2
+    
+    board = [['.' for _ in range(W)] for _ in range(H)]
     for i in range(h):
-        if wall(i, 0):
-            entrance.append((i, 0))
-        if wall(i, w - 1):
-            entrance.append((i, w - 1))
-    
-    for j in range(w):
-        if wall(0, j):
-            entrance.append((0, j))
-        if wall(h - 1, j):
-            entrance.append((h - 1, j))
+        for j in range(w):
+            board[i + 1][j + 1] = graph[i][j]
             
+    has_key = [False] * 26
+    if keys_str != '0':
+        for c in keys_str:
+            has_key[ord(c) - 97] = True  # 'a'->0
+    #일단 입구 위치 부터 찾아야한다.
+            
+    door = defaultdict(set)
+    visited = [[0] * W for _ in range(H)]   
     answer = 0
+    #열쇠를 회득했을때 문을 열면 된다.
     
-    for x, y in entrance:
-        q = deque([(x, y)])
+    q = deque()
+    q.append((0, 0))
+    visited[0][0] = 1
+
+    wait_doors = [[] for _ in range(26)]
+    
+    while q:        
+        x, y = q.popleft()
         
-        if graph[x][y] == '$':
-            visited[x][y] == 1
-            answer += 1
-        
-        if graph[x][y] != '.' and graph[x][y].lower() not in keys:
-            continue
-        
-        while q:        
-            x, y = q.popleft()
-            #문서이면 회득
-            if graph[x][y] == '$':
-                visited[x][y] == 1
-                answer += 1
+        for d in range(4):
+            nx, ny = x + dx[d], y + dy[d]
             
-            if graph[x][y] != '.' and graph[x][y].lower() in keys:
-                entrance.append()
+            if not (0 <= nx < H and 0 <= ny < W):
+                continue
+            if visited[nx][ny]:
+                continue
+            
+            cell = board[nx][ny]
+            if cell == '*':  # 벽
+                continue
+        
+            #얻어야하는 문서인 경우
+            if cell == '$':
+                visited[nx][ny] = 1
+                board[nx][ny] = '.'
+                answer += 1
+                q.append((nx, ny))
+            #이동가능한 경로인 경우
+            elif board[nx][ny] == '.':
+                visited[nx][ny] = 1
+                q.append((nx, ny))
+            #열쇠인 경우
+            elif 'a' <= cell <= 'z':
+                idx = ord(cell) - 97
                 
-            for d in range(4):
-                pass
+                if not has_key[idx]:
+                    has_key[idx] = True
+                    
+                    for wx, wy in wait_doors[idx]:
+                        if not visited[wx][wy]:
+                            visited[wx][wy] = 1
+                            board[wx][wy] = '.'
+                            q.append((wx, wy))
+                    wait_doors[idx].clear()
+                board[nx][ny] = '.'
+                visited[nx][ny] = 1
+                q.append((nx, ny))
+            #이동한 곳에 문인 경우 
+            else:
+                idx = ord(cell) - 65
+                if has_key[idx]:
+                    board[nx][ny] = '.'
+                    visited[nx][ny] = 1
+                    q.append((nx, ny))
+                else:
+                    # 아직 못 여는 문: 방문 처리 금지, 대기리스트에 저장
+                    wait_doors[idx].append((nx, ny))
     print(answer)
